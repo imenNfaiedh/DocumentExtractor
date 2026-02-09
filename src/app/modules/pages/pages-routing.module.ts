@@ -1,6 +1,5 @@
 import { NgModule } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
-import {PagesModule} from "./pages.module";
 import {DocumentExtactorComponent} from "./document-extactor/document-extactor.component";
 import {PagesLayoutComponent} from "../../layouts/pages-layout/pages-layout.component";
 

@@ -1,13 +1,43 @@
+<div class="sidenav" [ngClass]="collapsed ? 'sidenav-collapsed' : ''">
+  <div class="logo-container">
+    <div class="logo-content">
+      <button *ngIf="!collapsed" class="logo" (click)="toggleCollapse()">
+        <i class="pi pi-list"></i>
+      </button>
 
-<aside class="w-64 bg-gray-900 text-white min-h-screen p-4">
-  <nav class="space-y-2">
-    <a
-      routerLink="/doc"
-      routerLinkActive="bg-gray-700"
-      class="block px-4 py-2 rounded hover:bg-gray-700"
-    >
-      Scanner
-    </a>
+<!--      <img *ngIf="collapsed" src="assets/logoo1-removebg-preview.png"-->
+<!--           class="logo-img" alt="Logo">-->
+<!--      -->
+<!--      <h6 *ngIf="collapsed" class="logo-title"></h6>-->
+    </div>
 
-  </nav>
-</aside>
+    <button *ngIf="collapsed" class="btn-close" (click)="closeSidenav()">
+      <i class="pi pi-times"></i>
+    </button>
+  </div>
+  <ul class="sidenav-nav">
+    <li *ngFor="let item of navItems" class="sidenav-nav-item">
+      <a
+        (click)="selectItem()"
+        *ngIf="!item.title"
+        [routerLinkActiveOptions]="{ exact: true }"
+        [routerLink]="[item.routeLink]"
+        class="sidenav-nav-link"
+        routerLinkActive="active"
+      >
+        <i [ngClass]="item.icon + ' sidenav-link-icon'"></i>
+        <span *ngIf="collapsed" @fadeInOut class="sidenav-link-text">
+          {{ item.label  }}
+        </span>
+      </a>
+      <!--      <span *ngIf="data.title"><h6>  {{data.label}}</h6></span>-->
+      <span
+        *ngIf="collapsed && item.title"
+        @fadeInOut
+        class="sidenav-title-text"
+      >
+        {{ item.label  }}
+      </span>
+    </li>
+  </ul>
+</div>

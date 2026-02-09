@@ -1,0 +1,148 @@
+.sidenav {
+  background: #fdfdfd;
+color: #1F2937;
+transition: all .5s ease;
+  position: fixed;
+  z-index: 1;
+  top: 0;
+  width: 5rem;
+  height: 100vh;
+  box-shadow: rgba(0, 0, 0, 0.1) 0px 1px 2px 0px;
+
+  &.sidenav-collapsed {
+    width: 20.5625rem;
+  }
+
+/*//.logo-container {*/
+/*//  background: #F4F5F0;*/
+/*//  display: flex;*/
+/*//  flex-direction: column;*/
+/*//  align-items: center;*/
+/*//  justify-content: center;*/
+/*//  padding: 0.5rem; // réduit le padding*/
+/*//  border-radius: 0.75rem;*/
+/*//  margin: 0.75rem auto; // centré verticalement et horizontalement*/
+/*//  height: auto;*/
+/*//  width: fit-content; // largeur automatique selon le contenu*/
+/*//}*/
+
+
+  .logo-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+  }
+
+
+
+  .logo-img {
+    width: 20rem;
+    height: 5rem;
+    border-radius: 0.5rem;
+    object-fit: contain;
+  }
+
+  .logo-title {
+    font-size: 14px;
+    font-weight: 600;
+    text-align: center;
+
+    margin: 0;
+  }
+
+  .btn-close {
+    background: transparent;
+    border: none;
+    color: #0a0a0a;
+    font-size: 1.5rem;
+    cursor: pointer;
+  }
+}
+.sidenav-collapsed {
+  width: 20.5625rem;
+}
+
+.sidenav-nav {
+  list-style: none;
+  padding: 0.938rem;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: calc(100% - 3.65rem);
+  cursor: pointer;
+  border : none;
+
+  .sidenav-nav-item {
+    width: 100%;
+    margin-bottom: 0.625rem;
+
+
+    .sidenav-nav-link {
+      display: flex;
+      align-items: center;
+      height: 3rem;
+      color: #6B7280;
+      text-decoration: none;
+      border-radius: 0.625rem;
+      transition: all .3s ease;
+
+      .sidenav-link-icon {
+        font-size: 22px;
+        width: 2rem;
+        min-width: 2rem;
+        margin: 0 0.5rem;
+        text-align: center;
+        color: #9CA3AF;
+      }
+
+      .sidenav-link-text {
+        margin-left: 1.5rem;
+      }
+    }
+  }
+
+  .sidenav-nav-item:hover {
+    .sidenav-nav-link {
+      background-color: #DBEAFE;
+    color: #1F2937;
+
+      .sidenav-link-icon {
+        color: #2563EB;
+      }
+    }
+  }
+}
+
+.active {
+  background-color: #BFDBFE;
+color: #1F2937;
+  border: none;
+
+
+
+  .sidenav-link-icon {
+    color: #2563EB;
+  }
+
+  .sidenav-link-text {
+    color: #404040;
+  }
+}
+
+.sidenav-title-text {
+  font-size: 20px;
+  padding: 1rem;
+
+}
+.btn-close {
+  background: none;
+  border: none;
+  color: #fff; /* ou une autre couleur*/
+font-size: 1.5rem;
+  cursor: pointer;
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+}
