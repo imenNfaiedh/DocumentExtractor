@@ -115,7 +115,12 @@
   margin-left: 5rem;
   z-index: 0;
   transition: all .5s ease;
-  background-color: #bdd9fc; /* jaune clair (test) */
+   /* jaune clair (test) */
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 1rem;
+  background-color: #f8f9fa;
 
 }
 
@@ -167,6 +172,25 @@
   font-style: italic;
 
   padding: 20px;
+}
+.header-actions {
+  display: flex;
+  align-items: center;
+}
+
+.btn-logout {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: #ef4444;
+  font-weight: bold;
+}
+
+.btn-logout:hover {
+  color: #b91c1c;
 }
 /* animation affichage popup*/
 @keyframes fadeIn {

@@ -1,1 +1,30 @@
-<p>document-extactor works!</p>
+<div class="flex flex-col items-center mt-10 space-y-4">
+  <h2 class="text-2xl font-semibold text-gray-800">Uploader un fichier pour extraction JSON</h2>
+
+  <input
+    type="file"
+    (change)="onFileSelected($event)"
+    class="border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
+  />
+
+  <button
+    (click)="uploadFile()"
+    [disabled]="!selectedFile"
+    class="bg-blue-500 text-white px-6 py-2 rounded hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
+  >
+    Extraire JSON
+  </button>
+
+  <!-- Loader -->
+  <div *ngIf="loading" class="flex flex-col items-center mt-6">
+    <div class="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent"></div>
+    <p class="mt-3 text-blue-600 font-medium">
+      {{ loadingMessage }}
+    </p>
+  </div>
+
+
+  <pre *ngIf="extractedData" class="bg-gray-100 p-4 rounded w-3/4 overflow-auto">
+    {{ extractedData | json }}
+  </pre>
+</div>

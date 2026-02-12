@@ -34,7 +34,18 @@ transition: all .5s ease;
     gap: 0.25rem;
   }
 
-
+  .logo {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 0.5rem;
+    color: #9ba2ae;
+    font-size: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    cursor: pointer;
+  }
 
   .logo-img {
     width: 20rem;
