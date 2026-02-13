@@ -2,6 +2,7 @@ import { Component } from '@angular/core';
 import {HttpClient, HttpClientModule, HttpHeaders} from "@angular/common/http";
 import {JsonPipe, NgIf} from "@angular/common";
 import {environment} from "../../../../environments/environment";
+import {FactureService} from "../../../core/service/facture.service";
 
 @Component({
   selector: 'app-document-extactor',
@@ -21,7 +22,7 @@ export class DocumentExtactorComponent {
   loading = false;
   loadingMessage = 'Analyse du document en cours...';
 
-   labels = {
+  labels = {
     ht: ['total ht','ht','hors taxe','sous total','subtotal', 'total hors taxe'],
     ttc: ['total ttc','ttc','net à payer','montant total','total facture','total'],
     tva: ['tva','vat','tax']
@@ -29,7 +30,8 @@ export class DocumentExtactorComponent {
 
 
 
-  constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient,
+              private factureService: FactureService) {}
 
   onFileSelected(event: any) {
     this.selectedFile = event.target.files[0];
@@ -81,6 +83,12 @@ export class DocumentExtactorComponent {
         if (res.status === 'succeeded') {
           this.extractedData = this.buildInvoiceJson(res.analyzeResult);
 
+          this.factureService.addFacture({
+            name: this.selectedFile?.name || 'inconnu',
+            date: new Date(),
+            data: this.extractedData
+          });
+
           // this.extractedData = res.analyzeResult; // ✅ JSON final
           this.loading = false;
           clearInterval(intervalId);
@@ -91,7 +99,7 @@ export class DocumentExtactorComponent {
           console.error('Erreur d\'analyse Azure', res);
         }
       });
-    }, 5000);
+    }, 6000);
   }
 
 
@@ -110,25 +118,28 @@ export class DocumentExtactorComponent {
       lignes: []
     };
 
-    // --- META
-    facture.meta.numero = this.regex(fullText, /(num[eé]ro\s*(de)?\s*facture|invoice\s*no|facture\s*n[°º]?)\s*[:\-]?\s*([A-Z0-9\/\-]+)/i, 3);
-    facture.meta.date = this.regex(fullText, /(date\s*(de\s*facturation)?)\s*[:\-]?\s*(\d{1,2}[\/\.-]\d{1,2}[\/\.-]\d{4})/i, 3);
-    facture.meta.devise = (fullText.match(/\b(tnd|eur|usd|mad|dzd)\b/) || [])[0] || '';
+    // META
+    facture.meta.numero = this.regex(fullText, /(facture\s*n[°º]?|num[eé]ro)\s*[:\-]?\s*([a-z0-9\/-]+)/i, 2);
+    facture.meta.date = this.regex(fullText, /date\s*[:\-]?\s*(\d{1,2}[\/\.-]\d{1,2}[\/\.-]\d{4})/i, 1);
+    facture.meta.devise = (fullText.match(/\b(tnd|eur|usd|mad|dzd)\b/i) || [])[0]?.toLowerCase() || 'tnd';
 
-    // --- SOCIETE
-    facture.societe.nom = this.regex(fullText, /soci[eé]t[eé]\s*\n\s*(.+)/i);
-    facture.societe.mf = this.regex(fullText, /mf\s*\n\s*(\S+)/i);
+    // SOCIETE
+    const societeMatch = fullText.match(/(soci[eé]t[eé]\s+([\w\s]+?))(?=\s+facture|client|$)/i);
+    if (societeMatch) facture.societe.nom = societeMatch[2].trim();
 
-    // --- CLIENT
-    facture.client.nom = this.regex(fullText, /client\s*[:\-]?\s*\n?\s*(.+)/i);
+    const mfMatch = fullText.match(/(?:^|\s)mf\s*[:\-]?\s*([a-z0-9\/]+)/i);
+    if (mfMatch) facture.societe.mf = mfMatch[1];
 
-    // --- TOTAUX
+    // CLIENT
+    facture.client = this.extractClientInfo(fullText);
+
+    // TOTAUX
     const totals = this.buildInvoiceTotals(fullText);
     facture.totaux.ht = totals.ht;
     facture.totaux.ttc = totals.ttc;
     facture.totaux.tva = totals.tva;
 
-    // --- LIGNES
+    // LIGNES
     facture.lignes = this.extractLinesFromTables(analyzeResult);
     if (facture.lignes.length === 0) {
       facture.lignes = this.extractLinesFromText(fullText);
@@ -156,6 +167,23 @@ export class DocumentExtactorComponent {
       res.push({ taux: +match[1], montant: this.toNumber(match[2]) });
     }
     return res;
+  }
+  extractClientInfo(text: string): any {
+    const client = { nom: '', mf: '', adresse: '' };
+
+    // Nom du client
+    const nomMatch = text.match(/client\s*[:\-]?\s*\n?\s*([^\n]+?)(?=\s+mf|\s+adresse|$)/i);
+    if (nomMatch) client.nom = nomMatch[1].trim();
+
+    // MF client
+    const mfMatch = text.match(/(?:mf|matricule\s+fiscal)\s*[:\-]?\s*([a-z0-9\/]+)/i);
+    if (mfMatch) client.mf = mfMatch[1];
+
+    // Adresse
+    const adrMatch = text.match(/adresse?\s*[:\-]?\s*\n?\s*(.+?)(?=\s+(?:cher|devise|total|$))/i);
+    if (adrMatch) client.adresse = adrMatch[1].trim();
+
+    return client;
   }
 
   // --- Extraction lignes à partir des tables
@@ -226,30 +254,23 @@ export class DocumentExtactorComponent {
   }
 
   // --- Recherche de montant dans le texte
+  // Améliorer la méthode findAmountAnywhere :
   findAmountAnywhere(text: string, keywords: string[]): number | null {
     const normalized = this.normalizeText(text);
-    const tokens = normalized.split(' ');
 
-    for (let i = 0; i < tokens.length; i++) {
-      for (const word of keywords) {
+    for (const keyword of keywords) {
+      // Regex plus précise pour capturer les montants après le mot-clé
+      const patterns = [
+        new RegExp(`${keyword}[\\s:]*([0-9]+[\\s.,][0-9]+)`, 'i'),
+        new RegExp(`${keyword}[\\s:]*([0-9]+)`, 'i'),
+        new RegExp(`([0-9]+[\\s.,][0-9]+)[\\s]*${keyword}`, 'i')
+      ];
 
-        // 1) mot collé au nombre
-        const regInline = new RegExp(`${word}.{0,40}?([0-9][0-9\\s.,]+)`, 'i');
-        const inline = normalized.match(regInline);
-        if (inline) return this.toNumber(inline[1]);
-
-        // 2) mot seul → nombre dans les 6 tokens suivants
-        if (tokens[i].includes(word)) {
-          for (let j = i + 1; j <= i + 6 && j < tokens.length; j++) {
-            const num = this.toNumber(tokens[j]);
-            if (num > 0) return num;
-          }
+      for (const pattern of patterns) {
+        const match = normalized.match(pattern);
+        if (match) {
+          return this.toNumber(match[1]);
         }
-
-        // 3) nombre avant mot
-        const regReverse = new RegExp(`([0-9][0-9\\s.,]+).{0,20}?${word}`, 'i');
-        const rev = normalized.match(regReverse);
-        if (rev) return this.toNumber(rev[1]);
       }
     }
     return null;
@@ -264,12 +285,18 @@ export class DocumentExtactorComponent {
   // --- Conversion en nombre
   toNumber(value: any): number {
     if (!value) return 0;
-    return Number(
-      value.toString()
-        .replace(/\s/g, '')          // supprime espaces
-        .replace(/[^\d,.-]/g, '')   // supprime tout sauf chiffres
-        .replace(',', '.')
-    );
+    const str = value.toString()
+      .replace(/\s/g, '')           // supprime espaces
+      .replace(/[^\d,.-]/g, '')     // garde chiffres et séparateurs
+      .replace(/,/g, '.');           // remplace , par .
+
+    // Gestion des milliers (ex: 1 820,000 -> 1820.000)
+    const parts = str.split('.');
+    if (parts.length > 2) {
+      // Si plusieurs points, c'est probablement un séparateur de milliers
+      return Number(parts.join(''));
+    }
+    return Number(str) || 0;
   }
 
   // --- Normalisation du texte
@@ -281,6 +308,22 @@ export class DocumentExtactorComponent {
       .toLowerCase()
       .trim();
   }
-}
 
+
+  downloadJson() {
+    if (!this.extractedData) return;
+
+    const dataStr = JSON.stringify(this.extractedData, null, 2);
+    const blob = new Blob([dataStr], { type: 'text/json;charset=utf-8' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+
+    a.href = url;
+    a.download = `facture_${this.extractedData.facture?.meta?.numero || 'export'}.json`;
+    a.click();
+
+    window.URL.revokeObjectURL(url);
+  }
+
+}
 

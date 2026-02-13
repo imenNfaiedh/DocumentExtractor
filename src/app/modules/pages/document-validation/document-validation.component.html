@@ -1,0 +1,35 @@
+<div class="flex flex-col items-center mt-10 w-full">
+  <h2 class="text-2xl font-semibold text-gray-800 mb-6">Liste des factures scannées</h2>
+
+  <table  class="border border-gray-300 w-3/4 text-sm">
+    <thead class="bg-gray-200">
+    <tr>
+      <th class="border p-2">Nom fichier</th>
+      <th class="border p-2">Date scan</th>
+      <th class="border p-2">Numéro facture</th>
+      <th class="border p-2">Total TTC</th>
+      <th class="border p-2">Action</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    <tr *ngFor="let f of factures">
+      <td class="border p-2">{{ f.name }}</td>
+      <td class="border p-2">{{ f.date | date:'short' }}</td>
+      <td class="border p-2">{{ f.data.facture?.meta?.numero }}</td>
+      <td class="border p-2">{{ f.data.facture?.totaux?.ttc }}</td>
+      <td class="border p-2">
+        <button
+          class="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600"
+          >
+          Voir
+        </button>
+      </td>
+    </tr>
+    </tbody>
+  </table>
+
+  <p *ngIf="factures.length === 0" class="text-gray-500">
+    Aucune facture scannée pour le moment.
+  </p>
+</div>
