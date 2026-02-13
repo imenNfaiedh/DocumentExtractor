@@ -1,8 +1,32 @@
-<div [ngClass]="getBodyClass()" class="header">
-  <div class="header-actions">
-    <button class="btn-logout" >
-      <i class="pi pi-sign-out"></i>
-      <span>Logout</span>
+<div [ngClass]="getBodyClass()" class="w-full h-16 flex items-center justify-between px-6 bg-white shadow">
+
+  <!-- Right Actions -->
+  <div class="flex items-center gap-5 ml-auto">
+
+    <!-- Notification -->
+    <button class="relative text-gray-600 hover:text-blue-600 transition">
+      <i class="fas fa-bell text-lg"></i>
+
+      <!-- Badge -->
+      <span class="absolute -top-1 -right-1 bg-red-500 text-white text-xs px-1.5 rounded-full">
+        3
+      </span>
     </button>
+
+    <!-- Profile -->
+    <div class="flex items-center gap-2 cursor-pointer group">
+      <img
+        src="https://i.pravatar.cc/40"
+        alt="profile"
+        class="w-9 h-9 rounded-full border-2 border-gray-200 group-hover:border-blue-500 transition"
+      />
+
+    </div>
+
+    <!-- Logout -->
+    <button class="text-gray-600 hover:text-red-500 transition">
+      <i class="fas fa-right-from-bracket text-lg"></i>
+    </button>
+
   </div>
 </div>

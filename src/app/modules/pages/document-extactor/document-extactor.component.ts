@@ -22,7 +22,7 @@ export class DocumentExtactorComponent {
   loadingMessage = 'Analyse du document en cours...';
 
    labels = {
-    ht: ['total ht','ht','hors taxe','sous total','subtotal'],
+    ht: ['total ht','ht','hors taxe','sous total','subtotal', 'total hors taxe'],
     ttc: ['total ttc','ttc','net à payer','montant total','total facture','total'],
     tva: ['tva','vat','tax']
   };
@@ -96,59 +96,39 @@ export class DocumentExtactorComponent {
 
 
 
+  // --- Construire le JSON final
   buildInvoiceJson(analyzeResult: any) {
-
     const text = analyzeResult.content || '';
+    const tablesText = this.extractTotalsFromTables(analyzeResult);
+    const fullText = this.normalizeText(text + " " + tablesText);
 
     const facture: any = {
       meta: {},
       societe: {},
       client: {},
-      totaux: {
-        tva: []
-      },
+      totaux: {},
       lignes: []
     };
 
+    // --- META
+    facture.meta.numero = this.regex(fullText, /(num[eé]ro\s*(de)?\s*facture|invoice\s*no|facture\s*n[°º]?)\s*[:\-]?\s*([A-Z0-9\/\-]+)/i, 3);
+    facture.meta.date = this.regex(fullText, /(date\s*(de\s*facturation)?)\s*[:\-]?\s*(\d{1,2}[\/\.-]\d{1,2}[\/\.-]\d{4})/i, 3);
+    facture.meta.devise = (fullText.match(/\b(tnd|eur|usd|mad|dzd)\b/) || [])[0] || '';
 
-    // META
-    facture.meta.numero =
-      this.regex(text,
-        /(num[eé]ro\s*(de)?\s*facture|invoice\s*no|facture\s*n[°º]?)\s*[:\-]?\s*([A-Z0-9\/\-]+)/i,
-        3
-      );
+    // --- SOCIETE
+    facture.societe.nom = this.regex(fullText, /soci[eé]t[eé]\s*\n\s*(.+)/i);
+    facture.societe.mf = this.regex(fullText, /mf\s*\n\s*(\S+)/i);
 
-    facture.meta.date =
-      this.regex(text,
-        /(date\s*(de\s*facturation)?)\s*[:\-]?\s*(\d{1,2}[\/\.-]\d{1,2}[\/\.-]\d{4})/i,
-        3
-      );
+    // --- CLIENT
+    facture.client.nom = this.regex(fullText, /client\s*[:\-]?\s*\n?\s*(.+)/i);
 
-    facture.meta.devise =
-      (text.match(/\b(TND|EUR|USD|MAD|DZD)\b/) || [])[0] || '';
+    // --- TOTAUX
+    const totals = this.buildInvoiceTotals(fullText);
+    facture.totaux.ht = totals.ht;
+    facture.totaux.ttc = totals.ttc;
+    facture.totaux.tva = totals.tva;
 
-    // SOCIETE
-    facture.societe.nom =
-      this.regex(text, /soci[eé]t[eé]\s*\n\s*(.+)/i);
-    facture.societe.mf =
-      this.regex(text, /mf\s*\n\s*(\S+)/i);
-
-    // CLIENT
-    facture.client.nom =
-      this.regex(text, /client\s*:\s*\n\s*(.+)/i);
-
-    // TOTAUX
-    const fullText = this.normalizeText(text + " " + this.extractTotalsFromTables(analyzeResult));
-    facture.totaux.ht = this.findAmountAnywhere(fullText, this.labels.ht.map(l => l.toLowerCase()));
-    facture.totaux.ttc = this.findAmountAnywhere(fullText, this.labels.ttc.map(l => l.toLowerCase()));
-
-
-    facture.totaux.timbre = this.toNumber(this.regex(text, /timbre\s*([\d\s,\.]+)/i));
-
-    // TVA (multi taux)
-    facture.totaux.tva = this.extractTVA(fullText);
-
-    // LIGNES
+    // --- LIGNES
     facture.lignes = this.extractLinesFromTables(analyzeResult);
     if (facture.lignes.length === 0) {
       facture.lignes = this.extractLinesFromText(fullText);
@@ -156,90 +136,109 @@ export class DocumentExtactorComponent {
 
     return { facture };
   }
-  extractLinesFromTables(analyzeResult:any) {
-    const lignes:any[]=[];
 
-    analyzeResult.tables?.forEach((table:any)=>{
-      const rows:any={};
+  // --- Totaux dynamiques
+  buildInvoiceTotals(fullText: string) {
+    return {
+      ht: this.findAmountAnywhere(fullText, this.labels.ht),
+      ttc: this.findAmountAnywhere(fullText, this.labels.ttc),
+      tva: this.extractTVA(fullText)
+    };
+  }
 
-      table.cells.forEach((c:any)=>{
-        rows[c.rowIndex]=rows[c.rowIndex]||{};
-        rows[c.rowIndex][c.columnIndex]=c.content;
+  // --- TVA multi-taux
+  extractTVA(text: string): any[] {
+    const normalized = this.normalizeText(text);
+    const res: any[] = [];
+    const regex = /(\d{1,2})\s*%\s*[:=]?\s*([0-9\s,.]+)/g;
+    let match;
+    while ((match = regex.exec(normalized)) !== null) {
+      res.push({ taux: +match[1], montant: this.toNumber(match[2]) });
+    }
+    return res;
+  }
+
+  // --- Extraction lignes à partir des tables
+  extractLinesFromTables(analyzeResult: any) {
+    const lignes: any[] = [];
+    analyzeResult.tables?.forEach((table: any) => {
+      const rows: any = {};
+      table.cells.forEach((c: any) => {
+        rows[c.rowIndex] = rows[c.rowIndex] || {};
+        rows[c.rowIndex][c.columnIndex] = c.content;
       });
-
-      const header=this.findHeaderRow(rows);
-      if(!header) return;
-
-      const cols=this.detectColumns(header);
-
-      Object.values(rows).slice(1).forEach((row:any)=>{
-        if(!row[cols.description]) return;
+      const header = this.findHeaderRow(rows);
+      if (!header) return;
+      const cols = this.detectColumns(header);
+      Object.values(rows).slice(1).forEach((row: any) => {
+        if (!row[cols.description]) return;
         lignes.push({
-          description:row[cols.description],
-          quantite:this.toNumber(row[cols.quantite]),
-          prixUnitaire:this.toNumber(row[cols.prix]),
-          total:this.toNumber(row[cols.total])
+          description: row[cols.description],
+          quantite: this.toNumber(row[cols.quantite]),
+          prixUnitaire: this.toNumber(row[cols.prix]),
+          total: this.toNumber(row[cols.total])
         });
       });
     });
-
     return lignes;
   }
 
-  findHeaderRow(rows:any){
-    return Object.values(rows).find((row:any)=>
-      Object.values(row).some((cell:any)=>
-        /desc|libell|designation|article|produit/i.test(cell)
-      )
+  findHeaderRow(rows: any) {
+    return Object.values(rows).find((row: any) =>
+      Object.values(row).some((cell: any) => /desc|libell|designation|article|produit/i.test(cell))
     );
   }
 
-
-  regex(text: string, reg: RegExp, group: number = 1): string {
-    const m = text.match(reg);
-    return m ? m[group].trim() : '';
-  }
-  detectColumns(header:any){
-    const map:any={};
-    Object.keys(header).forEach(col=>{
-      const h=header[col].toLowerCase();
-      if(/desc|libell|designation|article|produit/.test(h)) map.description=col;
-      if(/quant|qte|qty|nombre/.test(h)) map.quantite=col;
-      if(/pu|prix.*unit|unit.*prix|price/.test(h)) map.prix=col;
-      if(/total|montant|amount|ttc/.test(h)) map.total=col;
+  detectColumns(header: any) {
+    const map: any = { description: null, quantite: null, prix: null, total: null };
+    Object.keys(header).forEach(col => {
+      const h = header[col].toLowerCase();
+      if (/desc|libell|designation|article|produit/.test(h)) map.description = col;
+      if (/quant|qte|qty|qté|nombre/.test(h)) map.quantite = col;
+      if (/pu|prix.*unit|prix unitaire|unit.*prix|price/.test(h)) map.prix = col;
+      if (/total|montant|amount|ttc/.test(h)) map.total = col;
     });
     return map;
   }
 
-  toNumber(value: any): number {
-    if (!value) return 0;
-    return Number(
-      value.toString()
-        .replace(/\s/g,'')          // supprime tous les espaces
-        .replace(/[^\d,.-]/g, '')   // supprime tout sauf chiffres, points et virgules
-        .replace(',', '.')
-    );
+  // --- Extraction lignes si pas de table
+  extractLinesFromText(text: string) {
+    const lignes: any[] = [];
+    const matches = [...text.matchAll(/(.+?)\s+(\d+)\s+([\d,.]+)\s+([\d,.]+)/g)];
+    matches.forEach(m => {
+      lignes.push({
+        description: m[1],
+        quantite: this.toNumber(m[2]),
+        prixUnitaire: this.toNumber(m[3]),
+        total: this.toNumber(m[4])
+      });
+    });
+    return lignes;
   }
-  findAmountAnywhere(text: string, keywords: string[]) {
 
-    const tokens = text.split(' ');
+  // --- Extraire totaux des tables pour compléter HT/TTC
+  extractTotalsFromTables(analyzeResult: any) {
+    const arr: string[] = [];
+    analyzeResult.tables?.forEach((t: any) => {
+      t.cells.forEach((c: any) => arr.push(c.content));
+    });
+    return arr.join(' ');
+  }
+
+  // --- Recherche de montant dans le texte
+  findAmountAnywhere(text: string, keywords: string[]): number | null {
+    const normalized = this.normalizeText(text);
+    const tokens = normalized.split(' ');
 
     for (let i = 0; i < tokens.length; i++) {
+      for (const word of keywords) {
 
-      for (let word of keywords) {
+        // 1) mot collé au nombre
+        const regInline = new RegExp(`${word}.{0,40}?([0-9][0-9\\s.,]+)`, 'i');
+        const inline = normalized.match(regInline);
+        if (inline) return this.toNumber(inline[1]);
 
-        // --- cas 1 : mot collé au nombre
-        const regInline = new RegExp(
-          `${word}.{0,40}?([0-9][0-9\\s.,]+)`,
-          'i'
-        );
-        const inline = text.match(regInline);
-        if (inline) {
-          const v = this.toNumber(inline[1]);
-          if (v > 0) return v;
-        }
-
-        // --- cas 2 : mot seul → nombre dans les 6 tokens suivants
+        // 2) mot seul → nombre dans les 6 tokens suivants
         if (tokens[i].includes(word)) {
           for (let j = i + 1; j <= i + 6 && j < tokens.length; j++) {
             const num = this.toNumber(tokens[j]);
@@ -247,64 +246,41 @@ export class DocumentExtactorComponent {
           }
         }
 
-        // --- cas 3 : nombre avant mot
-        const regReverse = new RegExp(
-          `([0-9][0-9\\s.,]+).{0,20}?${word}`,
-          'i'
-        );
-        const rev = text.match(regReverse);
-        if (rev) {
-          const v = this.toNumber(rev[1]);
-          if (v > 0) return v;
-        }
+        // 3) nombre avant mot
+        const regReverse = new RegExp(`([0-9][0-9\\s.,]+).{0,20}?${word}`, 'i');
+        const rev = normalized.match(regReverse);
+        if (rev) return this.toNumber(rev[1]);
       }
     }
     return null;
   }
 
-  extractTVA(text:string){
-    const res:any[]=[];
-    const matches=[...text.matchAll(/(\d{1,2})\s*%[^0-9]{0,10}([\d\s,.]+)/g)];
-    matches.forEach(m=>{
-      res.push({ taux:+m[1], montant:this.toNumber(m[2]) });
-    });
-    return res;
+  // --- Regex helper
+  regex(text: string, reg: RegExp, group: number = 1): string {
+    const m = text.match(reg);
+    return m ? m[group].trim() : '';
   }
-  extractTotalsFromTables(analyzeResult:any){
-    const arr:string[]=[];
-    analyzeResult.tables?.forEach((t:any)=>{
-      t.cells.forEach((c:any)=>{
-        // si la cellule contient 'ttc' ou 'ht', ajoute le contenu de la cellule voisine
-        arr.push(c.content);
-      });
-    });
-    return arr.join(' ');
+
+  // --- Conversion en nombre
+  toNumber(value: any): number {
+    if (!value) return 0;
+    return Number(
+      value.toString()
+        .replace(/\s/g, '')          // supprime espaces
+        .replace(/[^\d,.-]/g, '')   // supprime tout sauf chiffres
+        .replace(',', '.')
+    );
   }
+
+  // --- Normalisation du texte
   normalizeText(text: string): string {
     return text
-      .replace(/\s+/g, ' ')        // remplace toutes les lignes et espaces multiples par un espace
-      .replace(/\u00A0/g, ' ')     // remplace les espaces insécables
-      .toLowerCase();              // tout en minuscules
+      .replace(/\s+/g, ' ')
+      .replace(/\u00A0/g, ' ')
+      .replace(/€/g, 'EUR')
+      .toLowerCase()
+      .trim();
   }
-
-  extractLinesFromText(text:string){
-    const lignes:any[]=[];
-    const matches=[...text.matchAll(/(.+?)\s+(\d+)\s+([\d,.]+)\s+([\d,.]+)/g)];
-    matches.forEach(m=>{
-      lignes.push({
-        description:m[1],
-        quantite:this.toNumber(m[2]),
-        prixUnitaire:this.toNumber(m[3]),
-        total:this.toNumber(m[4])
-      });
-    });
-    return lignes;
-  }
-
-
-
-
-
 }
 
 
