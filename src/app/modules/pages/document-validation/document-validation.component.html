@@ -4,11 +4,10 @@
   <table  class="border border-gray-300 w-3/4 text-sm">
     <thead class="bg-gray-200">
     <tr>
-      <th class="border p-2">Nom fichier</th>
-      <th class="border p-2">Date scan</th>
-      <th class="border p-2">Numéro facture</th>
-      <th class="border p-2">Total TTC</th>
-      <th class="border p-2">Action</th>
+      <th class="border p-2 content-center">Nom fichier</th>
+      <th class="border p-2 content-center">Date scan</th>
+      <th class="border p-2 content-center">Numéro facture</th>
+      <th class="border p-2 content-center">Action</th>
     </tr>
     </thead>
 
@@ -17,7 +16,6 @@
       <td class="border p-2">{{ f.name }}</td>
       <td class="border p-2">{{ f.date | date:'short' }}</td>
       <td class="border p-2">{{ f.data.facture?.meta?.numero }}</td>
-      <td class="border p-2">{{ f.data.facture?.totaux?.ttc }}</td>
       <td class="border p-2">
         <button
           class="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600"
